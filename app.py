@@ -20,6 +20,38 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 from pathlib import Path
+import configparser
+
+# ============================================================================
+# 🔑 GEMINI API KEY CONFIGURATION
+# ============================================================================
+# To change your API key, edit: gemini_config.ini
+# Find the line: api_key = YOUR_KEY_HERE
+# Replace with your new key and save
+# ============================================================================
+
+def load_gemini_api_key():
+    """Load Gemini API key from gemini_config.ini"""
+    try:
+        config = configparser.ConfigParser()
+        # Try gemini_config.ini first (cleaner format)
+        if os.path.exists('gemini_config.ini'):
+            config.read('gemini_config.ini', encoding='utf-8')
+        else:
+            # Fallback to config.ini
+            config.read('config.ini', encoding='utf-8')
+        
+        api_key = config.get('GEMINI', 'api_key', fallback=None)
+        if api_key and api_key != "YOUR_API_KEY_HERE":
+            return api_key
+        else:
+            st.warning("⚠️ Gemini API key not configured in gemini_config.ini")
+            return None
+    except Exception as e:
+        st.error(f"❌ Error loading API key: {e}")
+        return None
+
+GEMINI_API_KEY = load_gemini_api_key()
 
 # Suppress Plotly and Streamlit deprecation warnings
 warnings.filterwarnings('ignore', category=DeprecationWarning)
@@ -421,7 +453,13 @@ def main():
     
     # Initialize components
     nlp_processor = initialize_nlp_processor()
-    recommender = create_recommender(df)
+    recommender = create_recommender(df, gemini_api_key=GEMINI_API_KEY)
+    
+    # Display Gemini status
+    if hasattr(recommender, 'gemini_enhancer') and recommender.gemini_enhancer:
+        st.success("✅ Gemini AI initialized successfully with gemini-2.0-flash-exp")
+    else:
+        st.info("ℹ️ Running without Gemini AI enhancements")
     
     # Sidebar - Filters and Inputs
     st.sidebar.markdown("<h2 style='color: white; text-align: center;'>🔍 Search & Filter</h2>", unsafe_allow_html=True)
@@ -477,15 +515,29 @@ def main():
     # Advanced options (collapsible)
     with st.sidebar.expander("⚙️ Advanced Options"):
         st.markdown("<p style='color: #2d3748; font-weight: 600; font-size: 1.1rem;'>Recommendation Weights:</p>", unsafe_allow_html=True)
-        alpha = st.slider("NLP Similarity Weight", 0.0, 1.0, 0.5, 0.1)
-        beta = st.slider("Content Match Weight", 0.0, 1.0, 0.3, 0.1)
-        gamma = st.slider("Popularity Weight", 0.0, 1.0, 0.2, 0.1)
+        alpha = st.slider("NLP Similarity Weight", 0.0, 1.0, 0.6, 0.1, 
+                         help="How much to prioritize semantic understanding of your query")
+        beta = st.slider("Content Match Weight", 0.0, 1.0, 0.3, 0.1,
+                        help="How much to prioritize matching specific activities/features")
+        gamma = st.slider("Popularity Weight", 0.0, 1.0, 0.1, 0.1,
+                         help="How much to prioritize highly-rated destinations")
+        
+        st.markdown("<p style='color: #2d3748; font-weight: 600; font-size: 1.1rem; margin-top: 20px;'>🤖 AI Insights:</p>", unsafe_allow_html=True)
+        num_ai_insights = st.slider(
+            "Number of AI-Enhanced Insights",
+            min_value=1,
+            max_value=10,
+            value=5,
+            step=1,
+            help="How many destinations should get detailed AI-generated insights"
+        )
         
         st.info(f"""
         **Current Configuration:**
         - NLP: {alpha:.0%}
         - Content: {beta:.0%}
         - Popularity: {gamma:.0%}
+        - AI Insights: {num_ai_insights} destinations
         """)
     
     # Get recommendations button
@@ -523,7 +575,8 @@ def main():
                         top_n=top_n,
                         alpha=alpha,
                         beta=beta,
-                        gamma=gamma
+                        gamma=gamma,
+                        num_ai_insights=num_ai_insights
                     )
                 
                 if len(recommendations) > 0:
@@ -570,8 +623,35 @@ def main():
                                 st.markdown(f"<p style='font-size: 1.1rem;'><strong>🎨 Highlights:</strong> {' • '.join(highlights[:4])}</p>", unsafe_allow_html=True)
                             
                             if 'final_score' in row:
-                                score_color = "#48bb78" if row['final_score'] > 0.7 else "#667eea" if row['final_score'] > 0.5 else "#f6ad55"
-                                st.markdown(f"<p style='font-size: 1.2rem;'><strong>🎯 Match Score:</strong> <span style='color: {score_color}; font-weight: 700;'>{row['final_score']:.3f}</span></p>", unsafe_allow_html=True)
+                                # Quality indicator based on score
+                                if row['final_score'] >= 0.7:
+                                    quality_indicator = "🌟 Excellent Match"
+                                    score_color = "#48bb78"
+                                elif row['final_score'] >= 0.5:
+                                    quality_indicator = "✨ Good Match"
+                                    score_color = "#667eea"
+                                elif row['final_score'] >= 0.3:
+                                    quality_indicator = "⭐ Decent Match"
+                                    score_color = "#f6ad55"
+                                else:
+                                    quality_indicator = "💫 Weak Match"
+                                    score_color = "#cbd5e0"
+                                
+                                st.markdown(f"<p style='font-size: 1.2rem;'><strong>🎯 {quality_indicator}:</strong> <span style='color: {score_color}; font-weight: 700;'>{row['final_score']:.3f}</span></p>", unsafe_allow_html=True)
+                            
+                            # AI Insight (if available)
+                            if 'ai_insight' in row and pd.notna(row['ai_insight']):
+                                st.markdown(f"""
+                                    <div style='background: linear-gradient(135deg, rgba(72, 187, 120, 0.15) 0%, rgba(102, 126, 234, 0.15) 100%); 
+                                                padding: 20px; border-radius: 10px; margin-top: 20px; border-left: 4px solid #48bb78;'>
+                                        <h4 style='color: #2d3748; margin-top: 0; font-size: 1.2rem; display: flex; align-items: center;'>
+                                            🤖 AI Travel Insight
+                                        </h4>
+                                        <p style='font-size: 1.05rem; line-height: 1.7; margin: 10px 0 0 0; color: #2d3748;'>
+                                            {row['ai_insight']}
+                                        </p>
+                                    </div>
+                                """, unsafe_allow_html=True)
                             
                             # Description
                             description = row.get('short_description', 'No description available.')
@@ -585,7 +665,7 @@ def main():
                             st.markdown("</div>", unsafe_allow_html=True)
                         
                         # Show score breakdown in expander
-                        with st.expander(f"📈 See Score Breakdown for {row['city']}"):
+                        with st.expander(f"� See How Results Were Calculated for {row['city']}"):
                             col1, col2 = st.columns([2, 1])
                             
                             with col1:
@@ -603,6 +683,19 @@ def main():
                                 st.metric("Popularity Score", f"{row.get('popularity_score', 0):.3f}")
                                 st.metric("Final Score", f"{row.get('final_score', 0):.3f}", 
                                          delta=None, delta_color="off")
+                                
+                                # Show calculation formula
+                                st.markdown("---")
+                                st.markdown(f"""
+                                **Calculation:**
+                                ```
+                                Final = {alpha:.1f}×NLP + 
+                                        {beta:.1f}×Content + 
+                                        {gamma:.1f}×Popularity
+                                      = {row.get('final_score', 0):.3f}
+                                ```
+                                """)
+                
                     
                     # Download recommendations
                     st.markdown("---")
