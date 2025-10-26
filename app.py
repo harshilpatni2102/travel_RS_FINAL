@@ -502,15 +502,18 @@ def main():
         help="Only show destinations with rating above this threshold"
     )
     
-    # Number of recommendations
+    # Number of recommendations (AI insights will match this number)
     top_n = st.sidebar.slider(
-        "📊 Number of Recommendations:",
+        "📊 Number of Recommendations (with AI Insights):",
         min_value=3,
         max_value=20,
         value=5,
         step=1,
-        help="How many destinations to recommend"
+        help="How many destinations to recommend - all will include AI-generated insights"
     )
+    
+    # AI insights automatically match top_n
+    num_ai_insights = top_n
     
     # Advanced options (collapsible)
     with st.sidebar.expander("⚙️ Advanced Options"):
@@ -522,22 +525,12 @@ def main():
         gamma = st.slider("Popularity Weight", 0.0, 1.0, 0.1, 0.1,
                          help="How much to prioritize highly-rated destinations")
         
-        st.markdown("<p style='color: #2d3748; font-weight: 600; font-size: 1.1rem; margin-top: 20px;'>🤖 AI Insights:</p>", unsafe_allow_html=True)
-        num_ai_insights = st.slider(
-            "Number of AI-Enhanced Insights",
-            min_value=1,
-            max_value=10,
-            value=5,
-            step=1,
-            help="How many destinations should get detailed AI-generated insights"
-        )
-        
         st.info(f"""
         **Current Configuration:**
         - NLP: {alpha:.0%}
         - Content: {beta:.0%}
         - Popularity: {gamma:.0%}
-        - AI Insights: {num_ai_insights} destinations
+        - AI Insights: {num_ai_insights} destinations (auto-synced)
         """)
     
     # Get recommendations button

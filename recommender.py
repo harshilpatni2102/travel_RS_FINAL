@@ -303,20 +303,75 @@ class TravelRecommender:
         # Sort by final score
         results = results.sort_values('final_score', ascending=False)
         
-        # SMART QUALITY FILTERING: Only show results with decent match scores
-        # Don't force exact number if quality is poor
-        QUALITY_THRESHOLD = 0.3  # Minimum acceptable match score
-        quality_results = results[results['final_score'] >= QUALITY_THRESHOLD]
+        # ENHANCED SMART QUALITY FILTERING WITH CONTEXT AWARENESS
+        # 1. Check if user mentioned specific country/region in query
+        query_lower = user_query.lower() if user_query else ""
+        specific_location_mentioned = False
+        location_filter = None
         
-        if len(quality_results) == 0:
-            # If nothing meets threshold, show top 3 with warning
-            st.warning("⚠️ Limited matches found. Showing best available options:")
-            final_results = results.head(min(3, top_n))
+        # Check for country/region mentions in query
+        for idx, row in results.iterrows():
+            country = str(row.get('country', '')).lower()
+            region = str(row.get('region', '')).lower()
+            
+            if country and country in query_lower:
+                specific_location_mentioned = True
+                location_filter = country
+                break
+            # Check for region keywords
+            if any(keyword in query_lower for keyword in ['india', 'china', 'japan', 'france', 'italy', 'spain', 
+                                                          'usa', 'america', 'uk', 'england', 'thailand', 'indonesia']):
+                specific_location_mentioned = True
+                break
+        
+        # 2. Apply quality threshold - ONLY show truly relevant results
+        QUALITY_THRESHOLD = 0.4  # Minimum acceptable match score (increased for better quality)
+        
+        # If user mentioned specific location, filter more strictly
+        if specific_location_mentioned:
+            # Find the country/region from query
+            for idx, row in results.iterrows():
+                country = str(row.get('country', '')).lower()
+                if country and country in query_lower:
+                    location_filter = country
+                    break
+            
+            if location_filter:
+                # STRICT FILTERING: Only show from that country
+                location_results = results[results['country'].str.lower() == location_filter]
+                if len(location_results) > 0:
+                    quality_results = location_results[location_results['final_score'] >= QUALITY_THRESHOLD]
+                    if len(quality_results) > 0:
+                        st.success(f"✅ Found {len(quality_results)} quality matches in {location_filter.title()}")
+                        final_results = quality_results.head(top_n)
+                    else:
+                        st.warning(f"⚠️ Limited matches in {location_filter.title()}. Showing best available:")
+                        final_results = location_results.head(min(3, top_n))
+                else:
+                    st.error(f"❌ No destinations found in {location_filter.title()}")
+                    return pd.DataFrame()
+            else:
+                # General quality filtering
+                quality_results = results[results['final_score'] >= QUALITY_THRESHOLD]
+                if len(quality_results) == 0:
+                    st.warning("⚠️ Limited matches found. Showing best available options:")
+                    final_results = results.head(min(3, top_n))
+                else:
+                    final_results = quality_results.head(top_n)
+                    if len(quality_results) < top_n:
+                        st.info(f"ℹ️ Found {len(quality_results)} quality matches (showing all)")
         else:
-            # Return up to top_n quality results (may be less than requested)
-            final_results = quality_results.head(top_n)
-            if len(quality_results) < top_n:
-                st.info(f"ℹ️ Found {len(quality_results)} quality matches (showing all)")
+            # No specific location mentioned - use normal quality filtering
+            quality_results = results[results['final_score'] >= QUALITY_THRESHOLD]
+            
+            if len(quality_results) == 0:
+                st.warning("⚠️ Limited matches found. Showing best available options:")
+                final_results = results.head(min(3, top_n))
+            else:
+                # Return up to top_n quality results (may be less than requested)
+                final_results = quality_results.head(top_n)
+                if len(quality_results) < top_n:
+                    st.info(f"ℹ️ Found {len(quality_results)} quality matches (showing all)")
         
         # Generate AI insights if available and user query is provided
         if self.gemini_enhancer and user_query and len(final_results) > 0:
