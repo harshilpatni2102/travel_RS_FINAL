@@ -437,10 +437,16 @@ def format_destination_card(row: pd.Series,
     Returns:
         str: HTML formatted card
     """
+    import html
+    
     city = row.get('city', 'Unknown')
     country = row.get('country', 'N/A')
     region = row.get('region', 'N/A')
     description = row.get('short_description', 'No description available.')
+    
+    # Escape HTML in description to prevent rendering issues
+    description = html.escape(str(description))
+    
     rating = row.get('overall_rating', 0)
     budget = row.get('budget_level', 'N/A')
     
@@ -528,7 +534,7 @@ def display_dataframe_with_style(df: pd.DataFrame,
     
     st.dataframe(
         display_df,
-        width="stretch",
+        width='stretch',
         hide_index=True
     )
 

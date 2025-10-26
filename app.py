@@ -14,10 +14,19 @@ Date: 2025
 
 import os
 import sys
+import warnings
+import logging
 import pandas as pd
 import numpy as np
 import streamlit as st
 from pathlib import Path
+
+# Suppress Plotly and Streamlit deprecation warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+warnings.filterwarnings('ignore', category=FutureWarning)
+
+# Suppress Streamlit logger warnings about deprecated parameters
+logging.getLogger('streamlit').setLevel(logging.ERROR)
 
 # Import custom modules
 from nlp_module import create_nlp_processor
@@ -26,11 +35,8 @@ from utils import (
     plot_top_destinations_bar,
     plot_destinations_by_continent,
     plot_budget_distribution_pie,
-    plot_activity_popularity_histogram,
-    plot_activity_heatmap,
     render_interactive_map,
     plot_score_breakdown,
-    format_destination_card,
     get_activity_icons,
     display_dataframe_with_style
 )
@@ -48,36 +54,284 @@ st.set_page_config(
 # Custom CSS for better styling
 st.markdown("""
     <style>
+    /* Main app background and font */
     .main {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-attachment: fixed;
+    }
+    
+    /* Content area background */
+    .block-container {
+        background-color: rgba(255, 255, 255, 0.95);
+        padding: 2rem 3rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Sidebar styling - Light and clean */
+    [data-testid="stSidebar"] {
         background-color: #f8f9fa;
     }
+    
+    [data-testid="stSidebar"] .stMarkdown {
+        color: #2d3748;
+        font-size: 1.1rem;
+    }
+    
+    [data-testid="stSidebar"] label {
+        color: #2d3748 !important;
+        font-weight: 600;
+        font-size: 1.15rem;
+    }
+    
+    [data-testid="stSidebar"] .stTextArea textarea {
+        font-size: 1.05rem;
+        background-color: white;
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+    }
+    
+    [data-testid="stSidebar"] .stSelectbox select,
+    [data-testid="stSidebar"] input {
+        font-size: 1.1rem;
+        background-color: white;
+        color: #2d3748;
+        border: 2px solid #e2e8f0;
+    }
+    
+    /* Slider styling for better visibility */
+    [data-testid="stSidebar"] .stSlider {
+        padding: 15px 0;
+    }
+    
+    [data-testid="stSidebar"] .stSlider label {
+        color: #2d3748 !important;
+        font-size: 1.15rem;
+        margin-bottom: 10px;
+    }
+    
+    [data-testid="stSidebar"] .stSlider [role="slider"] {
+        background-color: #667eea !important;
+    }
+    
+    /* Slider value display */
+    [data-testid="stSidebar"] .stSlider div {
+        color: #2d3748 !important;
+    }
+    
+    /* Help text in sidebar */
+    [data-testid="stSidebar"] .stTooltipIcon {
+        color: #667eea !important;
+    }
+    
+    /* Sidebar headers with better styling */
+    [data-testid="stSidebar"] h2 {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 15px;
+        border-radius: 8px;
+        margin: 10px 0 20px 0;
+        font-size: 1.5rem;
+        text-align: center;
+    }
+    
+    [data-testid="stSidebar"] h3 {
+        background-color: #e2e8f0;
+        color: #2d3748;
+        padding: 10px 12px;
+        border-radius: 6px;
+        margin: 20px 0 15px 0;
+        font-size: 1.3rem;
+        border-left: 4px solid #667eea;
+    }
+    
+    /* Tab styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 24px;
+        background-color: transparent;
     }
+    
     .stTabs [data-baseweb="tab"] {
         height: 50px;
-        padding-left: 20px;
-        padding-right: 20px;
+        padding: 10px 25px;
+        background-color: #f0f2f6;
+        border-radius: 8px 8px 0 0;
+        font-size: 16px;
+        font-weight: 600;
+        transition: all 0.3s ease;
     }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #667eea;
+        color: white !important;
+    }
+    
+    /* Headers */
     h1 {
-        color: #1f77b4;
-        padding-bottom: 10px;
-        border-bottom: 3px solid #1f77b4;
+        color: #1a202c;
+        font-size: 2.5rem !important;
+        font-weight: 700 !important;
+        padding-bottom: 15px;
+        border-bottom: 4px solid #667eea;
+        margin-bottom: 25px;
+        text-align: center;
     }
+    
     h2 {
-        color: #ff7f0e;
+        color: #2d3748;
+        font-size: 1.8rem !important;
+        font-weight: 600 !important;
+        margin-top: 30px;
+        margin-bottom: 20px;
     }
+    
     h3 {
-        color: #2ca02c;
+        color: #4a5568;
+        font-size: 1.4rem !important;
+        font-weight: 600 !important;
+        margin-top: 20px;
+        margin-bottom: 15px;
     }
+    
+    /* Paragraph text */
+    p {
+        font-size: 1.05rem;
+        line-height: 1.7;
+        color: #2d3748;
+    }
+    
+    /* Buttons */
     .stButton>button {
         width: 100%;
-        background-color: #0366d6;
-        color: white;
-        font-weight: bold;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white !important;
+        font-weight: 600;
+        font-size: 1.1rem;
+        padding: 14px 24px;
+        border: none;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(102, 126, 234, 0.4);
+        margin-top: 10px;
+        margin-bottom: 10px;
     }
+    
     .stButton>button:hover {
-        background-color: #0256c7;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(102, 126, 234, 0.6);
+        background: linear-gradient(135deg, #5568d3 0%, #653a8b 100%);
+    }
+    
+    /* Sidebar button styling */
+    [data-testid="stSidebar"] .stButton>button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white !important;
+        font-weight: 700;
+        font-size: 1.15rem;
+        padding: 16px 24px;
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        margin: 20px 0;
+    }
+    
+    [data-testid="stSidebar"] .stButton>button:hover {
+        background: linear-gradient(135deg, #5568d3 0%, #653a8b 100%);
+        box-shadow: 0 6px 12px rgba(102, 126, 234, 0.5);
+    }
+    
+    /* Metrics */
+    [data-testid="stMetricValue"] {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #667eea;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #4a5568;
+    }
+    
+    /* Info/Success/Warning boxes */
+    .stAlert {
+        border-radius: 10px;
+        font-size: 1.05rem;
+        padding: 15px;
+    }
+    
+    /* Containers */
+    .stContainer {
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        margin: 15px 0;
+    }
+    
+    /* Expander */
+    .streamlit-expanderHeader {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #2d3748;
+    }
+    
+    /* Sidebar expander */
+    [data-testid="stSidebar"] .streamlit-expanderHeader {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 12px 15px;
+        border-radius: 8px;
+        color: white !important;
+        font-size: 1.2rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    [data-testid="stSidebar"] .streamlit-expanderHeader:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+    }
+    
+    [data-testid="stSidebar"] .streamlit-expanderContent {
+        background-color: rgba(255, 255, 255, 0.05);
+        padding: 15px;
+        border-radius: 0 0 8px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: none;
+    }
+    
+    /* Dividers */
+    hr {
+        margin: 30px 0;
+        border: none;
+        border-top: 2px solid #e2e8f0;
+    }
+    
+    /* Input fields */
+    .stTextInput input, .stTextArea textarea, .stSelectbox select {
+        font-size: 1.05rem;
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+        padding: 10px;
+    }
+    
+    .stTextInput input:focus, .stTextArea textarea:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    /* Slider */
+    .stSlider {
+        padding: 10px 0;
+    }
+    
+    /* Download button */
+    .stDownloadButton>button {
+        background-color: #48bb78;
+        color: white;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 10px 20px;
+    }
+    
+    .stDownloadButton>button:hover {
+        background-color: #38a169;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -140,18 +394,29 @@ def initialize_nlp_processor():
 def main():
     """Main application function."""
     
-    # Header
-    st.title("✈️ Travel Destination Recommendation System")
+    # Header with enhanced styling
     st.markdown("""
-    ### Discover Your Perfect Travel Destination
-    *Powered by Natural Language Processing and Intelligent Recommendation Algorithms*
+        <div style="text-align: center; padding: 20px 0;">
+            <h1 style="font-size: 3rem; margin-bottom: 10px;">✈️ Travel Destination Recommendation System</h1>
+            <h3 style="color: #667eea; font-weight: 500; margin-bottom: 20px;">Discover Your Perfect Travel Destination</h3>
+            <p style="font-size: 1.1rem; color: #4a5568; font-style: italic;">
+                Powered by Natural Language Processing and Intelligent Recommendation Algorithms
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
     
-    This system combines **NLP-based semantic understanding** with **content-based filtering** 
-    to provide personalized travel recommendations based on your preferences.
-    """)
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); 
+                padding: 20px; border-radius: 10px; margin: 20px 0; text-align: center;">
+        <p style="font-size: 1.1rem; margin: 0; color: #2d3748;">
+            This system combines <strong>NLP-based semantic understanding</strong> with <strong>content-based filtering</strong> 
+            to provide personalized travel recommendations based on your preferences.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Load data
-    with st.spinner("Loading destination data..."):
+    with st.spinner("✨ Loading destination data..."):
         df = load_data()
     
     # Initialize components
@@ -159,19 +424,19 @@ def main():
     recommender = create_recommender(df)
     
     # Sidebar - Filters and Inputs
-    st.sidebar.header("🔍 Search & Filter")
+    st.sidebar.markdown("<h2 style='color: white; text-align: center;'>🔍 Search & Filter</h2>", unsafe_allow_html=True)
     
     # Natural language query input
-    st.sidebar.subheader("Tell Us What You Want")
+    st.sidebar.markdown("<h3 style='color: white; margin-top: 20px;'>💬 Tell Us What You Want</h3>", unsafe_allow_html=True)
     user_query = st.sidebar.text_area(
         "Describe your ideal destination:",
         placeholder="E.g., I want to relax on beautiful beaches in Asia with great food and affordable prices",
-        height=100,
+        height=120,
         help="Use natural language to describe your travel preferences. The AI will understand and find matching destinations!"
     )
     
     # Filter options
-    st.sidebar.subheader("Additional Filters")
+    st.sidebar.markdown("<h3 style='color: white; margin-top: 30px;'>🎯 Additional Filters</h3>", unsafe_allow_html=True)
     
     # Continent filter
     regions = ['All'] + sorted(df['region'].dropna().unique().tolist())
@@ -211,7 +476,7 @@ def main():
     
     # Advanced options (collapsible)
     with st.sidebar.expander("⚙️ Advanced Options"):
-        st.markdown("**Recommendation Weights:**")
+        st.markdown("<p style='color: #2d3748; font-weight: 600; font-size: 1.1rem;'>Recommendation Weights:</p>", unsafe_allow_html=True)
         alpha = st.slider("NLP Similarity Weight", 0.0, 1.0, 0.5, 0.1)
         beta = st.slider("Content Match Weight", 0.0, 1.0, 0.3, 0.1)
         gamma = st.slider("Popularity Weight", 0.0, 1.0, 0.2, 0.1)
@@ -266,8 +531,58 @@ def main():
                     
                     # Display recommendations as cards
                     for idx, row in recommendations.iterrows():
-                        card_html = format_destination_card(row, show_scores=True)
-                        st.markdown(card_html, unsafe_allow_html=True)
+                        # Use Streamlit native components with enhanced styling
+                        with st.container():
+                            # City header with styled background
+                            st.markdown(f"""
+                                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                            padding: 15px 20px; border-radius: 10px 10px 0 0; margin-bottom: 0;">
+                                    <h2 style="color: white; margin: 0; font-size: 1.8rem;">🌍 {row.get('city', 'Unknown')}, {row.get('country', 'N/A')}</h2>
+                                </div>
+                                <div style="background: white; padding: 20px; border-radius: 0 0 10px 10px; 
+                                            box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px;">
+                            """, unsafe_allow_html=True)
+                            
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.markdown(f"<p style='font-size: 1.1rem;'><strong>📍 Region:</strong> {row.get('region', 'N/A')}</p>", unsafe_allow_html=True)
+                            with col2:
+                                rating = row.get('overall_rating', 0)
+                                stars = "⭐" * int(round(rating))
+                                st.markdown(f"<p style='font-size: 1.1rem;'><strong>⭐ Rating:</strong> {rating:.2f}/5.0 {stars}</p>", unsafe_allow_html=True)
+                            with col3:
+                                budget = row.get('budget_level', 'N/A')
+                                budget_emoji = {'budget': '💰', 'mid-range': '💰💰', 'luxury': '💰💰💰'}.get(str(budget).lower(), '💰')
+                                st.markdown(f"<p style='font-size: 1.1rem;'><strong>{budget_emoji} Budget:</strong> {budget}</p>", unsafe_allow_html=True)
+                            
+                            # Activity highlights
+                            activity_cols = ['culture', 'adventure', 'nature', 'beaches', 
+                                           'nightlife', 'cuisine', 'wellness', 'urban', 'seclusion']
+                            activity_icons = {'culture': '🏛️', 'adventure': '🏔️', 'nature': '🌲', 'beaches': '🏖️',
+                                            'nightlife': '🎉', 'cuisine': '🍽️', 'wellness': '🧘', 'urban': '🏙️', 'seclusion': '🏝️'}
+                            highlights = []
+                            for col in activity_cols:
+                                if col in row and pd.notna(row[col]) and float(row[col]) >= 4.0:
+                                    icon = activity_icons.get(col, '✨')
+                                    highlights.append(f"{icon} {col.title()}")
+                            
+                            if highlights:
+                                st.markdown(f"<p style='font-size: 1.1rem;'><strong>🎨 Highlights:</strong> {' • '.join(highlights[:4])}</p>", unsafe_allow_html=True)
+                            
+                            if 'final_score' in row:
+                                score_color = "#48bb78" if row['final_score'] > 0.7 else "#667eea" if row['final_score'] > 0.5 else "#f6ad55"
+                                st.markdown(f"<p style='font-size: 1.2rem;'><strong>🎯 Match Score:</strong> <span style='color: {score_color}; font-weight: 700;'>{row['final_score']:.3f}</span></p>", unsafe_allow_html=True)
+                            
+                            # Description
+                            description = row.get('short_description', 'No description available.')
+                            st.markdown(f"""
+                                <div style='background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); 
+                                            padding: 15px; border-radius: 8px; margin-top: 15px;'>
+                                    <p style='font-size: 1.05rem; font-style: italic; margin: 0; color: #2d3748;'>{description}</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+                            
+                            st.markdown("</div>", unsafe_allow_html=True)
                         
                         # Show score breakdown in expander
                         with st.expander(f"📈 See Score Breakdown for {row['city']}"):
@@ -280,7 +595,7 @@ def main():
                                     row.get('popularity_score', 0),
                                     row['city']
                                 )
-                                st.plotly_chart(fig, width="stretch")
+                                st.plotly_chart(fig, use_container_width=True, key=f"score_{idx}")
                             
                             with col2:
                                 st.metric("NLP Score", f"{row.get('nlp_score', 0):.3f}")
@@ -364,7 +679,7 @@ def main():
                     top_n=pop_n,
                     title=f"Top {pop_n} Popular Destinations"
                 )
-                st.plotly_chart(fig, width="stretch")
+                st.plotly_chart(fig, use_container_width=True)
                 
                 # Show as table
                 st.subheader("Detailed View")
@@ -397,7 +712,7 @@ def main():
                 score_column=selected_activity,
                 title=f"Top Destinations for {selected_activity.title()}"
             )
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(fig, use_container_width=True)
     
     # TAB 3: VISUALIZATIONS
     with tabs[2]:
@@ -409,45 +724,14 @@ def main():
         with col1:
             st.subheader("Destinations by Region")
             fig = plot_destinations_by_continent(df)
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(fig, use_container_width=True)
         
         with col2:
             st.subheader("Budget Distribution")
             fig = plot_budget_distribution_pie(df)
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(fig, use_container_width=True)
         
-        # Row 2: Activity analysis
-        st.markdown("---")
-        st.subheader("Activity Popularity Analysis")
-        
-        col1, col2 = st.columns([3, 2])
-        
-        with col1:
-            fig = plot_activity_popularity_histogram(df)
-            st.plotly_chart(fig, width="stretch")
-        
-        with col2:
-            st.markdown("""
-            ### 📊 Insights
-            
-            This chart shows the average ratings across different activity categories 
-            for all destinations in our database.
-            
-            **Key Takeaways:**
-            - Identifies most popular activity types
-            - Helps understand destination strengths
-            - Guides recommendation priorities
-            """)
-        
-        # Row 3: Heatmap
-        st.markdown("---")
-        st.subheader("Activity Profile Heatmap")
-        
-        heatmap_n = st.slider("Number of destinations to show:", 10, 30, 15, key="heatmap_n")
-        fig = plot_activity_heatmap(df, top_n=heatmap_n)
-        st.plotly_chart(fig, width="stretch")
-        
-        # Row 4: Interactive map
+        # Row 2: Interactive map
         st.markdown("---")
         st.subheader("🗺️ Interactive World Map")
         
@@ -483,9 +767,36 @@ def main():
                 if result is not None:
                     st.success(f"✅ Found: {result['city']}")
                     
-                    # Display destination card
-                    card_html = format_destination_card(result, show_scores=False)
-                    st.markdown(card_html, unsafe_allow_html=True)
+                    # Display destination details using native Streamlit components
+                    with st.container():
+                        st.markdown(f"### 🌍 {result.get('city', 'Unknown')}, {result.get('country', 'N/A')}")
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.write(f"📍 **Region:** {result.get('region', 'N/A')}")
+                        with col2:
+                            st.write(f"⭐ **Rating:** {result.get('overall_rating', 0):.2f}/5.0")
+                        with col3:
+                            budget = result.get('budget_level', 'N/A')
+                            budget_emoji = {'budget': '💰', 'mid-range': '💰💰', 'luxury': '💰💰💰'}.get(str(budget).lower(), '💰')
+                            st.write(f"{budget_emoji} **Budget:** {budget}")
+                        
+                        # Activity highlights
+                        activity_cols = ['culture', 'adventure', 'nature', 'beaches', 
+                                       'nightlife', 'cuisine', 'wellness', 'urban', 'seclusion']
+                        highlights = []
+                        for col in activity_cols:
+                            if col in result and pd.notna(result[col]) and float(result[col]) >= 4.0:
+                                highlights.append(col.title())
+                        
+                        if highlights:
+                            st.write(f"🎨 **Highlights:** {', '.join(highlights)}")
+                        
+                        # Description
+                        description = result.get('short_description', 'No description available.')
+                        st.info(f"*{description}*")
+                        
+                        st.markdown("---")
                     
                     # Additional details
                     st.subheader("📊 Activity Ratings")
@@ -526,7 +837,7 @@ def main():
                             yaxis=dict(range=[0, 5])
                         )
                         
-                        st.plotly_chart(fig, width="stretch")
+                        st.plotly_chart(fig, use_container_width=True)
                     
                     # Similar destinations
                     st.markdown("---")
@@ -568,22 +879,39 @@ def main():
                 cities_df = df[['city', 'country', 'region']].sort_values('city')
                 st.dataframe(cities_df, width="stretch", height=400)
     
-    # Footer
+    # Footer - Clean and Professional
     st.markdown("---")
     st.markdown("""
-    <div style="text-align: center; padding: 20px; background: #f0f2f6; border-radius: 10px;">
-        <h3>📚 Academic Project Information</h3>
-        <p><b>Course:</b> Natural Language Processing & Recommendation Systems</p>
-        <p><b>Technologies:</b> Python, Streamlit, Sentence-Transformers (BERT), Scikit-learn, Plotly</p>
-        <p><b>Key Features:</b></p>
-        <ul style="list-style-position: inside;">
-            <li>🤖 <b>NLP:</b> Semantic text understanding using transformer-based embeddings</li>
-            <li>🎯 <b>Recommendation:</b> Hybrid content-based filtering with multiple signals</li>
-            <li>📊 <b>Visualization:</b> Interactive charts and geographic mapping</li>
-            <li>⚡ <b>Performance:</b> Optimized with caching and efficient algorithms</li>
-        </ul>
-        <p style="margin-top: 15px;">
-            <i>Built with ❤️ for academic excellence | © 2025</i>
+    <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); 
+                border-radius: 15px; margin-top: 40px;">
+        <h3 style="color: #667eea; margin-bottom: 20px;">🌍 About This System</h3>
+        <div style="display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; margin: 20px 0;">
+            <div style="text-align: center;">
+                <div style="font-size: 2.5rem;">🤖</div>
+                <p style="margin: 10px 0 5px 0; font-weight: 600; color: #2d3748;">NLP Powered</p>
+                <p style="margin: 0; font-size: 0.95rem; color: #4a5568;">BERT Embeddings</p>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 2.5rem;">🎯</div>
+                <p style="margin: 10px 0 5px 0; font-weight: 600; color: #2d3748;">Smart Recommendations</p>
+                <p style="margin: 0; font-size: 0.95rem; color: #4a5568;">Hybrid Filtering</p>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 2.5rem;">📊</div>
+                <p style="margin: 10px 0 5px 0; font-weight: 600; color: #2d3748;">Interactive Visuals</p>
+                <p style="margin: 0; font-size: 0.95rem; color: #4a5568;">Real-time Analytics</p>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 2.5rem;">⚡</div>
+                <p style="margin: 10px 0 5px 0; font-weight: 600; color: #2d3748;">High Performance</p>
+                <p style="margin: 0; font-size: 0.95rem; color: #4a5568;">Optimized Algorithms</p>
+            </div>
+        </div>
+        <p style="margin-top: 25px; color: #4a5568; font-size: 0.95rem;">
+            <i>Powered by Python • Streamlit • Sentence-Transformers • Scikit-learn • Plotly</i>
+        </p>
+        <p style="margin-top: 10px; color: #667eea; font-weight: 600;">
+            © 2025 Travel Destination Recommender
         </p>
     </div>
     """, unsafe_allow_html=True)
