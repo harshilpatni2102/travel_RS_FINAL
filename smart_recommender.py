@@ -92,7 +92,9 @@ class SmartRecommender:
             match_count = 0
             for activity in activities:
                 if activity in row and pd.notna(row[activity]):
-                    if float(row[activity]) >= MIN_ACTIVITY_SCORE:
+                    activity_value = float(row[activity])
+                    # Inclusive threshold: >= 3.0 (60% - shows more beach destinations)
+                    if activity_value >= 3.0:
                         match_count += 1
             
             # Single activity: must match
@@ -102,12 +104,12 @@ class SmartRecommender:
             if match_count >= required_matches:
                 valid_indices.append(idx)
         
-        filtered = df.loc[valid_indices].copy() if valid_indices else df.copy()
+        filtered = df.loc[valid_indices].copy() if valid_indices else pd.DataFrame()
         
         if len(valid_indices) > 0:
-            st.success(f"✅ Found {len(valid_indices)} destinations with strong {'/'.join(activities)} ratings")
+            st.success(f"✅ Found {len(valid_indices)} destinations with {'/'.join(activities)} ratings (3.0+)")
         else:
-            st.warning(f"⚠️ No destinations with high {'/'.join(activities)} scores. Showing general results.")
+            st.warning(f"❌ No destinations found with good {'/'.join(activities)} scores. Try different criteria.")
         
         return filtered
     
@@ -191,16 +193,31 @@ class SmartRecommender:
         # Add similarity scores to dataframe
         filtered_df['similarity_score'] = similarities
         
-        # Step 4: Filter by similarity threshold and sort
-        filtered_df = filtered_df[filtered_df['similarity_score'] >= SIMILARITY_THRESHOLD]
-        filtered_df = filtered_df.sort_values('similarity_score', ascending=False)
+        # Step 4: Filter and sort
+        # If activities detected, don't filter by semantic similarity (activity match is enough!)
+        if activities:
+            # Activity-based search - sort by activity relevance, not semantic similarity
+            filtered_df = filtered_df.sort_values('similarity_score', ascending=False)
+        else:
+            # General search - use semantic similarity threshold
+            filtered_df = filtered_df[filtered_df['similarity_score'] >= 0.25]
+            filtered_df = filtered_df.sort_values('similarity_score', ascending=False)
         
-        # Step 5: Get top N results
+        # Step 5: Get results - show all high-quality matches up to top_n
+        total_matches = len(filtered_df)
         results = filtered_df.head(top_n)
         
         if len(results) == 0:
-            st.warning("No matching destinations found. Try a different query.")
+            st.warning("❌ No destinations found matching your criteria. Try different keywords or location.")
             return pd.DataFrame()
+        
+        # Show result count feedback
+        if total_matches > top_n:
+            st.info(f"✅ Found {total_matches} matches! Showing top {len(results)} destinations. Increase 'Results' to see more.")
+        elif total_matches == len(results):
+            st.success(f"✅ Found all {len(results)} matching destination(s) for your query!")
+        else:
+            st.info(f"✅ Found {len(results)} high-quality match(es) (showing only highly relevant destinations)")
         
         # Step 6: Generate AI insights
         if use_ai and self.gemini_enhancer:

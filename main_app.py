@@ -250,8 +250,7 @@ def main():
             <p style="font-size: 1.2rem; color: #94a3b8; line-height: 1.8;">
                 ⚡ <strong>Fast & Lightweight</strong><br>
                 🎨 Direct activity matching<br>
-                📊 Simple keyword filtering<br>
-                ✨ Best for: "Beaches in Goa", "Mountains in Switzerland"
+                📊 Simple keyword filtering
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -268,8 +267,7 @@ def main():
             <p style="font-size: 1.2rem; color: #94a3b8; line-height: 1.8;">
                 🚀 <strong>Advanced AI Power</strong><br>
                 🔬 BERT semantic vectors (384D)<br>
-                💡 Context-aware understanding<br>
-                🎓 Best for: "Romantic getaway with spa", "Off-beat adventure"
+                💡 Context-aware understanding
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -325,11 +323,22 @@ def main():
         )
     
     with col2:
-        top_n = st.number_input("Results", min_value=1, max_value=15, value=5, label_visibility="collapsed")
+        # For Hybrid NLP, default to "Show All" mode (higher limit)
+        if "Hybrid NLP" in model_choice:
+            result_options = ["5", "10", "15", "20", "All Matches"]
+            selected_results = st.selectbox("Results", result_options, index=4, label_visibility="collapsed")
+            top_n = 100 if selected_results == "All Matches" else int(selected_results)
+        else:
+            top_n = st.number_input("Results", min_value=1, max_value=15, value=5, label_visibility="collapsed")
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        use_ai = st.checkbox("✨ AI Insights", value=True if gemini_enhancer else False, help="Generate detailed explanations with famous attractions using Gemini AI")
+        # AI insights only available for Hybrid NLP
+        if "Hybrid NLP" in model_choice:
+            use_ai = st.checkbox("✨ AI Insights", value=True if gemini_enhancer else False, help="Generate detailed explanations with famous attractions using Gemini AI (Hybrid NLP only)")
+        else:
+            use_ai = False
+            st.markdown('<p style="color: #94a3b8; font-size: 1.1rem;">🎯 Dataset Matching Only</p>', unsafe_allow_html=True)
     with col2:
         show_stats = st.checkbox("📊 Statistics", value=True, help="Show search statistics and metrics")
     with col3:
@@ -362,7 +371,10 @@ def main():
     # Results
     if search_btn and query:
         with st.spinner("🔍 Searching..."):
-            results = recommender.recommend(query, top_n=top_n, use_ai=use_ai and gemini_enhancer is not None)
+            # Content-Based: No AI (just dataset)
+            # Hybrid NLP: Use AI insights
+            use_ai_for_search = use_ai and gemini_enhancer is not None and "Hybrid NLP" in model_choice
+            results = recommender.recommend(query, top_n=top_n, use_ai=use_ai_for_search)
         
         if len(results) > 0:
             if show_stats:

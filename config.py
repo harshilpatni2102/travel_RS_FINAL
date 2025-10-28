@@ -32,5 +32,5 @@ EMBEDDING_DIM = 384  # Dimension of embeddings
 
 # Recommendation Settings
 DEFAULT_TOP_N = 5
-MIN_ACTIVITY_SCORE = 3.5  # Minimum score for activity filtering
-SIMILARITY_THRESHOLD = 0.3  # Minimum similarity for recommendations
+MIN_ACTIVITY_SCORE = 3.0  # Inclusive: Good quality ratings (60%+) - shows all relevant results
+SIMILARITY_THRESHOLD = 0.25  # Lower: 25% semantic match - shows ALL relevant results

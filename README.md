@@ -212,4 +212,3 @@ Natural Language Processing + Recommendation Systems
 
 ---
 
-**Note**: This is an academic project demonstrating NLP and Recommendation System concepts. The dataset and recommendations are for educational purposes only.

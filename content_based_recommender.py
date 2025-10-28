@@ -60,43 +60,46 @@ class ContentBasedRecommender:
         return detected
     
     def _score_destinations(self, df: pd.DataFrame, activities: List[str], query: str) -> pd.DataFrame:
-        """Score destinations based on activity match"""
+        """Score destinations based on activity match - ONLY show real matches"""
         scores = []
         
         for idx, row in df.iterrows():
             score = 0.0
             
-            # Base score from activities
+            # Score based on detected activities
             if activities:
-                activity_scores = []
+                matched_activities = 0
+                total_activity_score = 0
+                
                 for activity in activities:
                     if activity in row and pd.notna(row[activity]):
                         activity_value = float(row[activity])
-                        if activity_value >= MIN_ACTIVITY_SCORE:
-                            activity_scores.append(activity_value / 5.0)  # Normalize to 0-1
+                        # MUST be >= 3.0 to count as a match
+                        if activity_value >= 3.0:
+                            matched_activities += 1
+                            total_activity_score += activity_value / 5.0  # Normalize to 0-1
                 
-                if activity_scores:
-                    # Average of matched activities
-                    score = sum(activity_scores) / len(activity_scores)
+                # Only score if ALL activities matched
+                if matched_activities == len(activities):
+                    # Perfect match - all activities present
+                    score = total_activity_score / len(activities)
+                elif matched_activities >= len(activities) // 2 and len(activities) > 1:
+                    # For multiple activities, allow matching at least half
+                    score = (total_activity_score / len(activities)) * 0.8
                 else:
-                    # No strong matches - use overall rating
-                    activity_cols = ['culture', 'adventure', 'nature', 'beaches', 'nightlife', 'cuisine', 'wellness', 'urban', 'seclusion']
-                    ratings = [row.get(col, 0) for col in activity_cols if col in row and pd.notna(row.get(col))]
-                    if ratings:
-                        score = (sum(ratings) / len(ratings)) / 5.0 * 0.5  # Lower score for general match
+                    # Not enough matches - score = 0 (will be filtered out)
+                    score = 0.0
             else:
-                # No activities detected - use overall rating
-                activity_cols = ['culture', 'adventure', 'nature', 'beaches', 'nightlife', 'cuisine', 'wellness', 'urban', 'seclusion']
-                ratings = [row.get(col, 0) for col in activity_cols if col in row and pd.notna(row.get(col))]
-                if ratings:
-                    score = (sum(ratings) / len(ratings)) / 5.0 * 0.7
+                # No activities detected
+                score = 0.0
             
-            # Bonus for description match
-            description = str(row.get('short_description', '')).lower()
-            query_words = query.lower().split()
-            matching_words = sum(1 for word in query_words if len(word) > 3 and word in description)
-            description_bonus = min(0.2, matching_words * 0.05)
-            score += description_bonus
+            # Small bonus for description match (max 0.1)
+            if score > 0:
+                description = str(row.get('short_description', '')).lower()
+                query_words = query.lower().split()
+                matching_words = sum(1 for word in query_words if len(word) > 3 and word in description)
+                description_bonus = min(0.1, matching_words * 0.02)
+                score += description_bonus
             
             scores.append(min(1.0, score))  # Cap at 1.0
         
@@ -139,18 +142,32 @@ class ContentBasedRecommender:
         # Score destinations
         filtered_df = self._score_destinations(filtered_df, activities, query)
         
-        # Filter minimum threshold
-        filtered_df = filtered_df[filtered_df['similarity_score'] >= 0.3]
+        # Filter based on whether activities were detected
+        if activities:
+            # Activity-based search - keep all matches (activity score already filters quality)
+            filtered_df = filtered_df[filtered_df['similarity_score'] >= 0.1]  # Very low threshold - just remove zeros
+        else:
+            # General search - use higher threshold
+            filtered_df = filtered_df[filtered_df['similarity_score'] >= 0.25]
         
         # Sort by score
         filtered_df = filtered_df.sort_values('similarity_score', ascending=False)
         
-        # Get top N
+        # Get results
+        total_matches = len(filtered_df)
         results = filtered_df.head(top_n)
         
         if len(results) == 0:
-            st.warning("No matching destinations found. Try different keywords.")
+            st.warning("❌ No destinations found matching your criteria. Try different keywords or location.")
             return pd.DataFrame()
+        
+        # Show how many results found
+        if total_matches > top_n:
+            st.info(f"✅ Found {total_matches} matches! Showing top {len(results)} destinations.")
+        elif total_matches == len(results):
+            st.success(f"✅ Found all {len(results)} matching destination(s)!")
+        else:
+            st.info(f"✅ Found {len(results)} match(es)")
         
         # Generate AI insights if enabled
         if use_ai and self.gemini_enhancer:
