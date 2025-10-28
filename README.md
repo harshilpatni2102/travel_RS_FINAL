@@ -1,430 +1,215 @@
-# ✈️ Travel Destination Recommendation System
+# 🌍 Travel Destination Recommendation System
 
-[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.32.0-FF4B4B.svg)](https://streamlit.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+**An AI-Powered Travel Recommender combining NLP and Recommendation Systems**
 
-A comprehensive, production-ready travel destination recommendation system that combines **Natural Language Processing (NLP)** with **Content-Based Filtering** to provide intelligent, personalized travel suggestions.
+This is an academic project demonstrating advanced concepts in Natural Language Processing and Recommendation Systems, featuring BERT-based semantic search, content-based filtering, and AI validation.
 
-**Academic Project** for:
-- 📚 Natural Language Processing (NLP)
-- 🎯 Recommendation Systems
+## 🎯 Project Overview
 
----
+This system helps users discover perfect travel destinations using natural language queries. It combines:
 
-## 🌟 Features
+- **NLP-based Semantic Search**: BERT embeddings for understanding query meaning
+- **Content-Based Filtering**: Activity and location-based filtering
+- **AI Validation**: Gemini AI for generating personalized insights
+- **Efficient Storage**: Pre-computed embeddings stored in SQLite database
 
-### 🤖 Natural Language Processing
-- **Semantic Understanding**: Uses transformer-based BERT embeddings (`sentence-transformers`) to understand natural language queries
-- **Text Preprocessing**: Advanced cleaning, stopword removal, and synonym expansion
-- **Contextual Matching**: Computes cosine similarity between user preferences and destination profiles
-- **Multi-Feature Integration**: Combines city descriptions, activities, and metadata for rich semantic representation
+## ✨ Features
 
-### 🎯 Recommendation Engine
-- **Content-Based Filtering**: Matches user preferences with destination activity profiles
-- **Hybrid Approach**: Combines multiple recommendation signals (NLP similarity, content matching, popularity)
-- **Customizable Weights**: Adjustable parameters for different recommendation strategies
-- **Explainability**: Score breakdown showing how recommendations are computed
-- **Smart Filtering**: Region, budget, and rating filters with fallback mechanisms
+### 🧠 NLP Capabilities
+- **BERT Embeddings**: Uses `all-MiniLM-L6-v2` transformer model
+- **Semantic Understanding**: Understands natural language queries
+- **Pre-computed Storage**: Embeddings stored in database for fast retrieval
+- **Cosine Similarity**: Accurate semantic matching
 
-### 📊 Interactive Visualizations
-- **Geographic Mapping**: Interactive world map with destination markers (Folium)
-- **Statistical Charts**: Bar charts, pie charts, histograms using Plotly
-- **Activity Heatmaps**: Visual comparison of destination activity profiles
-- **Score Breakdowns**: Transparent view of recommendation computation
+### 🎯 Smart Recommendations
+- **Location Filtering**: Automatically detects country mentions ("beaches in India")
+- **Activity Detection**: Identifies activities (beaches, mountains, culture, etc.)
+- **Strict Filtering**: Only shows destinations with high activity scores (≥3.5/5)
+- **Ranked Results**: Sorted by semantic similarity
 
-### 💡 User Experience
-- **Modern UI**: Clean, responsive interface built with Streamlit
-- **Real-time Updates**: Instant recommendations as you type
-- **Multiple Views**: Tabs for recommendations, popular destinations, analytics, and search
-- **Export Functionality**: Download recommendations as CSV
-- **Performance Optimized**: Caching for fast response times
+### 🤖 AI Integration
+- **Gemini API**: Generates personalized travel insights
+- **Contextual Explanations**: AI explains why each destination matches
+- **Accurate Validation**: Ensures recommendations are relevant
 
----
+### 🎨 Beautiful UI
+- **Modern Design**: Clean, professional interface
+- **Responsive Layout**: Works on all screen sizes
+- **Google Fonts**: Inter font family for readability
+- **Gradient Backgrounds**: Eye-catching visuals
+- **Interactive Cards**: Expandable destination details
 
 ## 📁 Project Structure
 
 ```
 rs_travel/
-├── app.py                          # Main Streamlit application
-├── nlp_module.py                   # NLP preprocessing & semantic analysis
-├── recommender.py                  # Recommendation engine logic
-├── utils.py                        # Visualization & helper functions
-├── requirements.txt                # Python dependencies
-├── README.md                       # This file
-├── LICENSE                         # MIT License
-└── data/
-    └── Worldwide-Travel-Cities-Dataset-Ratings-and-Climate.csv
+├── main_app.py              # Main Streamlit application
+├── config.py                # Configuration and settings
+├── embedding_manager.py     # BERT embedding storage & retrieval
+├── smart_recommender.py     # Recommendation engine with AI
+├── requirements.txt         # Python dependencies
+├── data/                    # Dataset folder
+│   └── Worldwide-Travel-Cities-Dataset-Ratings-and-Climate.csv
+└── database/               # SQLite database for embeddings
+    └── embeddings.db       # Automatically created
 ```
 
-### Module Breakdown
+## 🚀 Installation & Setup
 
-#### `app.py` - Frontend Application
-- Streamlit web interface
-- User input handling
-- Tab-based navigation
-- Interactive visualizations
-- Result display and export
-
-#### `nlp_module.py` - NLP Pipeline
-- Text preprocessing (cleaning, tokenization)
-- Stopword removal
-- Synonym expansion for travel terms
-- BERT-based semantic embeddings
-- Cosine similarity computation
-- Destination text representation
-
-#### `recommender.py` - Recommendation Logic
-- Content-based filtering algorithms
-- Hybrid score computation
-- Filter application (region, budget, rating)
-- Popularity-based ranking
-- Similar destination finding
-- City search functionality
-
-#### `utils.py` - Utilities
-- Interactive chart generation (Plotly)
-- Geographic mapping (Folium)
-- Data formatting and display
-- Score visualization
-- HTML card generation
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Python 3.9 or higher
-- pip package manager
-- 4GB+ RAM recommended (for BERT models)
-
-### Installation
-
-1. **Clone or download the project**
-   ```bash
-   cd path/to/rs_travel
-   ```
-
-2. **Create a virtual environment** (recommended)
-   ```bash
-   # Windows
-   python -m venv venv
-   venv\Scripts\activate
-
-   # macOS/Linux
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Verify data file**
-   Ensure `Worldwide-Travel-Cities-Dataset-Ratings-and-Climate.csv` is in the `data/` folder
-
-### Running the Application
+### 1. Clone Repository
 
 ```bash
-streamlit run app.py
+git clone https://github.com/YOUR_USERNAME/travel_RS_FINAL.git
+cd travel_RS_FINAL
 ```
 
-The application will open in your default web browser at `http://localhost:8501`
+### 2. Install Dependencies
 
----
-
-## 📖 How to Use
-
-### 1. **Natural Language Query**
-In the sidebar, describe your ideal travel destination in plain English:
-
-**Examples:**
-- *"I want beautiful beaches and great seafood in Southeast Asia"*
-- *"Looking for cultural experiences and museums in Europe on a budget"*
-- *"Adventure activities like hiking and nature in South America"*
-- *"Luxury wellness retreats with spa and relaxation"*
-
-### 2. **Apply Filters** (Optional)
-- **Region**: Filter by continent/geographic region
-- **Budget**: Choose Budget, Mid-Range, or Luxury
-- **Minimum Rating**: Set quality threshold
-- **Number of Results**: How many recommendations to show
-
-### 3. **Adjust Weights** (Advanced)
-Fine-tune the recommendation algorithm:
-- **NLP Similarity**: How much to prioritize semantic matching
-- **Content Match**: Weight for activity profile similarity
-- **Popularity**: Influence of overall ratings
-
-### 4. **Explore Results**
-
-#### 🎯 Recommendations Tab
-- Personalized suggestions with detailed cards
-- Score breakdowns showing algorithm transparency
-- Download results as CSV
-
-#### 🏆 Popular Destinations Tab
-- Top-rated destinations overall
-- Filter by region and budget
-- Activity-specific rankings
-
-#### 📊 Visualizations Tab
-- Interactive charts and graphs
-- Activity popularity analysis
-- Geographic world map
-- Distribution statistics
-
-#### 🔎 Search Tab
-- Look up specific cities
-- View complete destination profiles
-- Find similar destinations
-
----
-
-## 🧠 Technical Deep Dive
-
-### NLP Architecture
-
-1. **Text Preprocessing**
-   ```python
-   User Query → Lowercase → Remove Punctuation → Remove Stopwords → Synonym Expansion
-   ```
-
-2. **Embedding Generation**
-   - Model: `all-MiniLM-L6-v2` (sentence-transformers)
-   - Output: 384-dimensional dense vectors
-   - Captures semantic meaning beyond keyword matching
-
-3. **Destination Representation**
-   - Combines: city name, country, region, description, activities, budget
-   - Activity emphasis based on ratings (high-rated activities repeated)
-   - Rich context for accurate matching
-
-4. **Similarity Computation**
-   ```python
-   Similarity = cosine_similarity(query_embedding, destination_embeddings)
-   ```
-
-### Recommendation Algorithm
-
-**Hybrid Score Formula:**
-
-```
-Final_Score = α × NLP_Score + β × Content_Score + γ × Popularity_Score
+```bash
+pip install -r requirements.txt
 ```
 
-Where:
-- **α (default: 0.5)** - Weight for semantic similarity
-- **β (default: 0.3)** - Weight for activity matching
-- **γ (default: 0.2)** - Weight for overall popularity
+### 3. Configure Gemini API
 
-**Normalization:**
-- All scores normalized to [0, 1] range
-- Ensures fair comparison across different scales
+Create a `.env` file in the project root:
 
-**Ranking:**
-- Destinations sorted by final score (descending)
-- Top-N results returned to user
+```env
+GEMINI_API_KEY=your_api_key_here
+```
 
-### Performance Optimizations
+Get your free API key from: https://makersuite.google.com/app/apikey
 
-1. **Caching**
-   - `@st.cache_data`: Dataset loading
-   - `@st.cache_resource`: NLP model loading
-   - Embeddings cached per session
+### 4. Run Application
 
-2. **Efficient Processing**
-   - Vectorized operations with NumPy/Pandas
-   - Batch encoding for multiple texts
-   - Lazy loading of visualizations
+```bash
+streamlit run main_app.py
+```
 
-3. **Fallback Mechanisms**
-   - Empty query → Popular destinations
-   - No filter matches → Remove filters
-   - Graceful error handling
+The app will open in your browser at `http://localhost:8501`
 
----
-
-## 📊 Dataset Information
+## 📊 Dataset
 
 **Source**: Worldwide Travel Cities Dataset (Ratings and Climate)
 
-**Columns:**
-- `city`, `country`, `region` - Geographic information
-- `latitude`, `longitude` - Coordinates for mapping
-- `short_description` - Text description of destination
-- `avg_temp_monthly` - Climate data
-- `ideal_durations` - Recommended stay duration
-- `budget_level` - Budget, Mid-Range, or Luxury
-- **Activity Ratings** (0-5 scale):
-  - `culture` - Museums, heritage, history
-  - `adventure` - Outdoor activities, sports
-  - `nature` - Natural beauty, wildlife
-  - `beaches` - Coastal and water activities
-  - `nightlife` - Entertainment, clubs, bars
-  - `cuisine` - Food quality and variety
-  - `wellness` - Spa, yoga, relaxation
-  - `urban` - City life, shopping, infrastructure
-  - `seclusion` - Privacy, tranquility
+**Features**:
+- **Cities**: 560+ destinations worldwide
+- **Attributes**: Culture, Adventure, Nature, Beaches, Nightlife, Cuisine, Wellness, Urban, Seclusion
+- **Metadata**: Country, Region, Budget Level, Ratings, Climate Data
 
----
+## 🎓 Academic Concepts Demonstrated
 
-## 🎓 Academic Alignment
+### Natural Language Processing
+1. **Text Preprocessing**: Tokenization, cleaning
+2. **Vectorization**: BERT-based embeddings (384-dimensional)
+3. **Semantic Similarity**: Cosine similarity computation
+4. **Transfer Learning**: Pre-trained transformer models
 
-### Natural Language Processing Components
+### Recommendation Systems
+1. **Content-Based Filtering**: Activity preference matching
+2. **Hybrid Approach**: Combining NLP + content features
+3. **Cold Start Solution**: Works without user history
+4. **Explainability**: AI-generated insights
 
-✅ **Text Preprocessing**
-- Tokenization, stopword removal, normalization
-- Domain-specific synonym expansion
+### Software Engineering
+1. **Database Design**: SQLite for embedding storage
+2. **Caching**: Streamlit caching for performance
+3. **Modular Architecture**: Separation of concerns
+4. **Error Handling**: Robust fallback mechanisms
 
-✅ **Semantic Embeddings**
-- Transformer-based language models (BERT)
-- Dense vector representations
-- Transfer learning from pre-trained models
+## 💡 Example Queries
 
-✅ **Similarity Metrics**
-- Cosine similarity for semantic matching
-- Distance-based ranking
+Try these natural language searches:
 
-✅ **Feature Engineering**
-- Multi-modal text combination
-- Weighted feature representation
+- `"Beautiful beaches in India"`
+- `"Mountain trekking in Nepal"`
+- `"Cultural heritage sites in Italy"`
+- `"Adventure sports in New Zealand"`
+- `"Peaceful wellness retreats in Thailand"`
+- `"Luxury beach resorts in Maldives"`
+- `"Budget-friendly cities in Europe"`
 
-### Recommendation System Components
+## 🔧 How It Works
 
-✅ **Content-Based Filtering**
-- Feature-based similarity computation
-- User preference modeling
-- Activity profile matching
-
-✅ **Hybrid Approaches**
-- Multiple recommendation signals
-- Weighted score aggregation
-- Adaptive weighting
-
-✅ **Explainability**
-- Score decomposition
-- Transparent ranking factors
-- User-interpretable results
-
-✅ **Evaluation & Filtering**
-- Constraint satisfaction
-- Multi-criteria ranking
-- Fallback strategies
-
----
-
-## 📈 Future Enhancements
-
-### Potential Improvements
-- 🌐 **Multilingual Support**: Translate queries to English automatically
-- 📱 **Mobile Optimization**: Responsive design for smartphones
-- 🔐 **User Accounts**: Save preferences and search history
-- 🌤️ **Live Data Integration**: Real-time weather and events APIs
-- 🤝 **Collaborative Filtering**: User-based recommendations using `surprise` library
-- 🎨 **Theme Customization**: Light/dark mode toggle
-- 🗣️ **Voice Input**: Speech-to-text for queries
-- 📸 **Image Integration**: Visual destination galleries
-- 💬 **Chatbot Interface**: Conversational recommendation flow
-- 📊 **A/B Testing**: Compare recommendation strategies
-
-### Scalability Considerations
-- Database integration (PostgreSQL, MongoDB)
-- Caching layer (Redis)
-- Containerization (Docker)
-- Cloud deployment (AWS, Azure, GCP)
-- Load balancing for multiple users
-
----
-
-## 🛠️ Development
-
-### Running Tests
-```bash
-# Test individual modules
-python nlp_module.py
-python recommender.py
-python utils.py
+### 1. Query Processing
+```
+User Query → Location Detection → Activity Detection
 ```
 
-### Code Style
-- Follows PEP 8 guidelines
-- Type hints for function signatures
-- Comprehensive docstrings
-- Inline comments for clarity
-
-### Dependencies Management
-```bash
-# Update requirements
-pip freeze > requirements.txt
-
-# Install specific package
-pip install package-name
-
-# Upgrade all packages
-pip install --upgrade -r requirements.txt
+### 2. Filtering Pipeline
+```
+Full Dataset → Location Filter → Activity Filter → Filtered Set
 ```
 
+### 3. Semantic Matching
+```
+Query → BERT Embedding → Cosine Similarity → Ranked Results
+```
+
+### 4. AI Enhancement
+```
+Top Results → Gemini API → Personalized Insights
+```
+
+## 📈 Technical Specifications
+
+| Component | Technology |
+|-----------|------------|
+| Frontend | Streamlit 1.31.0 |
+| NLP Model | all-MiniLM-L6-v2 (BERT) |
+| Embeddings | 384-dimensional vectors |
+| Database | SQLite 3 |
+| AI API | Google Gemini 2.0 Flash |
+| Similarity | Cosine Similarity |
+| Language | Python 3.11+ |
+
+## 🎯 Key Innovations
+
+1. **Pre-computed Embeddings**: Faster than real-time embedding
+2. **Strict Activity Filtering**: Ensures relevant results (≥3.5/5 threshold)
+3. **AI Validation**: Gemini verifies and explains recommendations
+4. **Smart Location Detection**: Auto-detects country names in queries
+5. **Modern UI/UX**: Professional, gradient-based design
+
+## 📝 Academic Alignment
+
+### NLP Course Requirements ✅
+- [x] Text preprocessing pipeline
+- [x] Tokenization and vectorization
+- [x] BERT/Transformer embeddings
+- [x] Semantic similarity computation
+- [x] Real-world application
+
+### Recommendation Systems Requirements ✅
+- [x] Content-based filtering
+- [x] Hybrid approach
+- [x] Feature engineering
+- [x] Ranking algorithm
+- [x] Explainability
+
+## 🐛 Troubleshooting
+
+**Issue**: Embeddings not computing
+- **Solution**: Delete `database/embeddings.db` and restart app
+
+**Issue**: AI insights not showing
+- **Solution**: Check `.env` file has valid GEMINI_API_KEY
+
+**Issue**: Slow first run
+- **Solution**: Normal! BERT model downloads on first run (~90MB)
+
+## 📚 References
+
+1. Sentence-Transformers: https://www.sbert.net/
+2. Streamlit Documentation: https://docs.streamlit.io/
+3. Google Gemini API: https://ai.google.dev/
+4. BERT Paper: Devlin et al., 2018
+
+## 👨‍💻 Author
+
+**Academic Project**  
+Natural Language Processing + Recommendation Systems  
+2025
+
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome! To contribute:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-### Contribution Guidelines
-- Follow existing code style
-- Add docstrings for new functions
-- Update README for new features
-- Test thoroughly before submitting
-
----
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- **sentence-transformers**: Pre-trained BERT models for semantic embeddings
-- **Streamlit**: Rapid web application framework
-- **Plotly**: Interactive visualization library
-- **Folium**: Geospatial mapping
-- **scikit-learn**: Machine learning utilities
-- **Pandas & NumPy**: Data processing foundations
-
----
-
-## 📧 Contact
-
-For questions, suggestions, or academic inquiries:
-
-- **GitHub**: [Your GitHub Profile]
-- **Email**: [Your Email]
-- **LinkedIn**: [Your LinkedIn]
-
----
-
-## 🎯 Project Goals Achieved
-
-✅ **Complete NLP Pipeline**: Text preprocessing → Embeddings → Similarity  
-✅ **Robust Recommendation Engine**: Content-based + Hybrid approach  
-✅ **Interactive Visualization**: Charts, maps, and analytics  
-✅ **Production-Ready Code**: Modular, documented, and optimized  
-✅ **Academic Documentation**: Clear alignment with course objectives  
-✅ **User-Friendly Interface**: Intuitive design for all skill levels  
-
----
-
-**Built with ❤️ for academic excellence | 2025**
-
-*This project demonstrates the integration of cutting-edge NLP techniques with traditional recommendation algorithms to solve real-world problems in the travel domain.*
+**Note**: This is an academic project demonstrating NLP and Recommendation System concepts. The dataset and recommendations are for educational purposes only.

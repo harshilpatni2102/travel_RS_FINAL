@@ -57,18 +57,23 @@ class NLPProcessor:
         
         # Synonym mappings for travel-related terms
         self.synonym_map = {
-            'beach': ['coast', 'seaside', 'shore', 'coastal'],
-            'city': ['urban', 'metropolitan', 'downtown'],
-            'nature': ['natural', 'wilderness', 'outdoors', 'wildlife'],
-            'adventure': ['adventurous', 'exciting', 'thrilling'],
-            'culture': ['cultural', 'heritage', 'historic', 'historical'],
-            'food': ['cuisine', 'culinary', 'dining', 'restaurant'],
-            'nightlife': ['party', 'entertainment', 'night'],
-            'relaxing': ['wellness', 'spa', 'peaceful', 'calm', 'quiet'],
-            'luxury': ['upscale', 'premium', 'expensive', 'high-end'],
-            'budget': ['cheap', 'affordable', 'economical', 'low-cost'],
-            'tropical': ['warm', 'hot', 'sunny'],
-            'cold': ['cool', 'winter', 'snow', 'skiing'],
+            'beach': ['coast', 'seaside', 'shore', 'coastal', 'sand'],
+            'city': ['urban', 'metropolitan', 'downtown', 'metropolis'],
+            'mountain': ['mountains', 'peaks', 'ranges', 'alpine', 'highlands'],
+            'nature': ['natural', 'wilderness', 'outdoors', 'wildlife', 'scenic', 'countryside'],
+            'adventure': ['adventurous', 'exciting', 'thrilling', 'hiking', 'trekking', 'climbing', 'rafting'],
+            'culture': ['cultural', 'heritage', 'historic', 'historical', 'museums', 'art'],
+            'food': ['cuisine', 'culinary', 'dining', 'restaurants', 'gastronomy'],
+            'nightlife': ['party', 'entertainment', 'night', 'clubs', 'bars'],
+            'relaxing': ['wellness', 'spa', 'peaceful', 'calm', 'quiet', 'serene', 'relaxation'],
+            'luxury': ['upscale', 'premium', 'expensive', 'high-end', 'five-star'],
+            'budget': ['cheap', 'affordable', 'economical', 'low-cost', 'inexpensive'],
+            'tropical': ['warm', 'hot', 'sunny', 'humid'],
+            'cold': ['cool', 'winter', 'snow', 'skiing', 'chilly'],
+            'winter': ['cold', 'cool', 'pleasant', 'mild', 'december', 'january', 'february'],
+            'summer': ['hot', 'warm', 'sunny', 'june', 'july', 'august'],
+            'spring': ['mild', 'pleasant', 'march', 'april', 'may'],
+            'autumn': ['fall', 'cool', 'september', 'october', 'november'],
         }
     
     @st.cache_resource
@@ -171,8 +176,8 @@ class NLPProcessor:
         
         return text
     
-    @st.cache_data
-    def encode_texts(_self, texts: List[str]) -> np.ndarray:
+    @st.cache_data(ttl=3600)  # Cache for 1 hour only
+    def encode_texts(_self, texts: List[str], _cache_version: str = "v2.0") -> np.ndarray:
         """
         Encode texts into semantic embeddings using the transformer model.
         
@@ -235,6 +240,37 @@ class NLPProcessor:
         if pd.notna(row.get('short_description')):
             text_parts.append(str(row['short_description']))
         
+        # Add seasonal information based on temperature data
+        if 'avg_temp_monthly' in row and pd.notna(row['avg_temp_monthly']):
+            try:
+                import json
+                temp_data = json.loads(row['avg_temp_monthly'].replace("'", '"'))
+                
+                # Analyze winter months (Dec, Jan, Feb)
+                winter_temps = [temp_data.get(str(m), {}).get('avg', 0) for m in [12, 1, 2]]
+                avg_winter = sum(winter_temps) / len(winter_temps) if winter_temps else 0
+                
+                # Analyze summer months (Jun, Jul, Aug)
+                summer_temps = [temp_data.get(str(m), {}).get('avg', 0) for m in [6, 7, 8]]
+                avg_summer = sum(summer_temps) / len(summer_temps) if summer_temps else 0
+                
+                # Add winter suitability
+                if 15 <= avg_winter <= 28:
+                    text_parts.extend(['perfect winter destination', 'ideal winter weather', 'pleasant winter', 'winter travel'] * 5)
+                elif 10 <= avg_winter < 15:
+                    text_parts.extend(['cool winter', 'mild winter', 'winter destination'] * 3)
+                elif avg_winter < 10:
+                    text_parts.extend(['cold winter', 'winter sports', 'snow'] * 2)
+                
+                # Add summer suitability
+                if 20 <= avg_summer <= 30:
+                    text_parts.extend(['perfect summer', 'ideal summer', 'summer destination'] * 3)
+                elif avg_summer > 30:
+                    text_parts.extend(['hot summer', 'tropical summer'] * 2)
+                
+            except:
+                pass
+        
         # Add activity features (high ratings indicate strong features)
         activity_cols = ['culture', 'adventure', 'nature', 'beaches', 
                         'nightlife', 'cuisine', 'wellness', 'urban', 'seclusion']
@@ -265,7 +301,7 @@ class NLPProcessor:
                                   user_query: str) -> pd.Series:
         """
         Main function to compute NLP-based similarity scores between
-        user query and all destinations.
+        user query and all destinations with temperature-aware filtering.
         
         Args:
             df (pd.DataFrame): Dataset with destination information
@@ -281,17 +317,76 @@ class NLPProcessor:
         if not processed_query.strip():
             return pd.Series(np.zeros(len(df)), index=df.index)
         
-        # Create destination texts
+        # Detect if query is about winter/specific season
+        query_lower = user_query.lower()
+        is_winter_query = any(term in query_lower for term in ['winter', 'december', 'january', 'february', 'cold season'])
+        is_summer_query = any(term in query_lower for term in ['summer', 'june', 'july', 'august', 'hot'])
+        
+        # Create destination texts with enhanced seasonal info
         destination_texts = df.apply(self.create_destination_text, axis=1).tolist()
         
         # Encode query
-        query_embedding = self.encode_texts([processed_query])
+        query_embedding = self.encode_texts([processed_query], _cache_version="v2.0")
         
         # Encode destinations
-        doc_embeddings = self.encode_texts(destination_texts)
+        doc_embeddings = self.encode_texts(destination_texts, _cache_version="v2.0")
         
         # Compute similarities
         similarities = self.compute_similarity(query_embedding, doc_embeddings)
+        
+        # Apply temperature-based filtering for winter queries
+        if is_winter_query and 'avg_temp_monthly' in df.columns:
+            import json
+            for idx, row in df.iterrows():
+                if pd.notna(row.get('avg_temp_monthly')):
+                    try:
+                        temp_data = json.loads(row['avg_temp_monthly'].replace("'", '"'))
+                        # Winter months: Dec (12), Jan (1), Feb (2)
+                        winter_temps = [temp_data.get(str(m), {}).get('avg', 0) for m in [12, 1, 2]]
+                        avg_winter = sum(winter_temps) / len(winter_temps) if winter_temps else 0
+                        
+                        # Boost score for ideal winter destinations (15-28°C)
+                        if 15 <= avg_winter <= 28:
+                            similarities[idx] *= 1.5  # 50% boost
+                        # Slightly boost mild winter (10-15°C or 28-32°C)
+                        elif (10 <= avg_winter < 15) or (28 < avg_winter <= 32):
+                            similarities[idx] *= 1.2  # 20% boost
+                        # Penalize too hot destinations (>35°C)
+                        elif avg_winter > 35:
+                            similarities[idx] *= 0.3  # 70% penalty
+                        # Penalize very cold (<5°C) unless query mentions "cold" or "snow"
+                        elif avg_winter < 5 and not any(term in query_lower for term in ['cold', 'snow', 'skiing', 'winter sports']):
+                            similarities[idx] *= 0.4  # 60% penalty
+                    except:
+                        pass
+        
+        # Apply temperature-based filtering for summer queries
+        elif is_summer_query and 'avg_temp_monthly' in df.columns:
+            import json
+            for idx, row in df.iterrows():
+                if pd.notna(row.get('avg_temp_monthly')):
+                    try:
+                        temp_data = json.loads(row['avg_temp_monthly'].replace("'", '"'))
+                        # Summer months: Jun (6), Jul (7), Aug (8)
+                        summer_temps = [temp_data.get(str(m), {}).get('avg', 0) for m in [6, 7, 8]]
+                        avg_summer = sum(summer_temps) / len(summer_temps) if summer_temps else 0
+                        
+                        # Boost score for good summer destinations (20-30°C)
+                        if 20 <= avg_summer <= 30:
+                            similarities[idx] *= 1.5
+                        # Slightly boost hot summer (30-35°C)
+                        elif 30 < avg_summer <= 35:
+                            similarities[idx] *= 1.2
+                        # Penalize too cold (<15°C)
+                        elif avg_summer < 15:
+                            similarities[idx] *= 0.3
+                    except:
+                        pass
+        
+        # Normalize back to 0-1 range
+        max_sim = similarities.max()
+        if max_sim > 0:
+            similarities = similarities / max_sim
         
         return pd.Series(similarities, index=df.index)
 

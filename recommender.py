@@ -225,7 +225,7 @@ class TravelRecommender:
                  gamma: float = 0.1,
                  num_ai_insights: int = 5) -> pd.DataFrame:
         """
-        Generate top-N recommendations using hybrid approach with smart quality filtering.
+        Generate top-N recommendations using AI-first approach with strict filtering.
         
         Args:
             nlp_similarity_scores (pd.Series): NLP similarity scores for all destinations
@@ -243,15 +243,89 @@ class TravelRecommender:
         Returns:
             pd.DataFrame: Recommended destinations with scores and AI insights
         """
-        # Apply filters
-        filtered_df = self.apply_filters(continent, budget, min_rating)
+        query_lower = user_query.lower() if user_query else ""
         
-        # Handle empty results
-        if len(filtered_df) == 0:
-            st.warning("No destinations match your filters. Showing popular destinations instead.")
-            filtered_df = self.df.copy()
+        # ============================================================================
+        # STEP 1: STRICT LOCATION FILTERING
+        # ============================================================================
+        # Extract country/location from query
+        location_filter = None
+        for idx, row in self.df.iterrows():
+            country = str(row.get('country', '')).lower()
+            if country and len(country) > 3 and country in query_lower:
+                location_filter = country
+                break
         
-        # Align NLP scores with filtered data
+        # Apply location filter FIRST if mentioned
+        if location_filter:
+            filtered_df = self.df[self.df['country'].str.lower() == location_filter].copy()
+            st.info(f"🔍 Filtering results to show only destinations in **{location_filter.title()}**")
+            
+            if len(filtered_df) == 0:
+                st.error(f"❌ No destinations found in {location_filter.title()} in our database.")
+                return pd.DataFrame()
+        else:
+            # Apply other filters
+            filtered_df = self.apply_filters(continent, budget, min_rating)
+            
+            if len(filtered_df) == 0:
+                st.warning("No destinations match your filters. Showing popular destinations instead.")
+                filtered_df = self.df.copy()
+        
+        # ============================================================================
+        # STEP 2: ACTIVITY-BASED FILTERING
+        # ============================================================================
+        # Extract activities from query and filter by them
+        activity_keywords = {
+            'beach': ['beach', 'beaches', 'sand', 'coast', 'seaside', 'ocean', 'sea'],
+            'mountain': ['mountain', 'mountains', 'hills', 'alpine', 'peaks', 'himalaya', 'trekking', 'hiking'],
+            'culture': ['culture', 'cultural', 'heritage', 'historic', 'history', 'museum', 'temple', 'palace'],
+            'adventure': ['adventure', 'trekking', 'hiking', 'climbing', 'rafting', 'sports'],
+            'nature': ['nature', 'natural', 'wildlife', 'forest', 'jungle', 'scenic'],
+            'nightlife': ['nightlife', 'party', 'clubs', 'bars', 'entertainment'],
+            'cuisine': ['food', 'cuisine', 'culinary', 'restaurant', 'eat', 'dining'],
+            'wellness': ['wellness', 'spa', 'relax', 'relaxation', 'peaceful', 'calm'],
+            'urban': ['city', 'urban', 'metropolitan', 'modern'],
+            'seclusion': ['secluded', 'remote', 'isolated', 'quiet', 'peaceful', 'escape']
+        }
+        
+        detected_activities = []
+        for activity, keywords in activity_keywords.items():
+            if any(keyword in query_lower for keyword in keywords):
+                detected_activities.append(activity)
+        
+        # If specific activities are mentioned, filter destinations with HIGH scores in those activities
+        if detected_activities:
+            st.info(f"🎯 Detected focus on: **{', '.join([a.title() for a in detected_activities])}**")
+            
+            # Filter to destinations that have at least 3.5+ rating in requested activities
+            ACTIVITY_THRESHOLD = 3.5
+            activity_filtered = []
+            
+            for idx, row in filtered_df.iterrows():
+                match_count = 0
+                for activity in detected_activities:
+                    if activity in row and pd.notna(row[activity]) and float(row[activity]) >= ACTIVITY_THRESHOLD:
+                        match_count += 1
+                
+                # Must match at least one activity strongly (or majority if multiple activities)
+                if len(detected_activities) == 1:
+                    if match_count >= 1:
+                        activity_filtered.append(idx)
+                else:
+                    # For multiple activities, require at least half to match
+                    if match_count >= len(detected_activities) / 2:
+                        activity_filtered.append(idx)
+            
+            if len(activity_filtered) > 0:
+                filtered_df = filtered_df.loc[activity_filtered]
+                st.success(f"✅ Found {len(filtered_df)} destinations matching your activity preferences")
+            else:
+                st.warning(f"⚠️ No destinations found with strong {'/'.join(detected_activities)} ratings. Showing general results.")
+        
+        # ============================================================================
+        # STEP 3: COMPUTE SCORES
+        # ============================================================================
         filtered_indices = filtered_df.index
         filtered_nlp_scores = nlp_similarity_scores.loc[filtered_indices]
         
@@ -267,23 +341,21 @@ class TravelRecommender:
         # Calculate popularity scores
         popularity_scores = filtered_df.apply(self.compute_popularity_score, axis=1)
         
-        # Normalize all scores to 0-1 range with better edge case handling
+        # Normalize all scores to 0-1 range
         def normalize_series(s):
             s_min, s_max = s.min(), s.max()
             if s_max > s_min and s_max > 0:
                 return (s - s_min) / (s_max - s_min)
             elif s_max > 0:
-                # All values are the same but non-zero
                 return pd.Series(1.0, index=s.index)
             else:
-                # All values are zero
                 return pd.Series(0.0, index=s.index)
         
         filtered_nlp_scores = normalize_series(filtered_nlp_scores)
         content_scores = normalize_series(content_scores)
         popularity_scores = normalize_series(popularity_scores)
         
-        # Compute hybrid scores with validated weights
+        # Compute hybrid scores
         hybrid_scores = filtered_df.index.map(
             lambda idx: self.get_hybrid_score(
                 filtered_nlp_scores[idx],
@@ -303,86 +375,20 @@ class TravelRecommender:
         # Sort by final score
         results = results.sort_values('final_score', ascending=False)
         
-        # ENHANCED SMART QUALITY FILTERING WITH CONTEXT AWARENESS
-        # 1. Check if user mentioned specific country/region in query
-        query_lower = user_query.lower() if user_query else ""
-        specific_location_mentioned = False
-        location_filter = None
+        # Get top results
+        final_results = results.head(top_n)
         
-        # Check for country/region mentions in query
-        for idx, row in results.iterrows():
-            country = str(row.get('country', '')).lower()
-            region = str(row.get('region', '')).lower()
-            
-            if country and country in query_lower:
-                specific_location_mentioned = True
-                location_filter = country
-                break
-            # Check for region keywords
-            if any(keyword in query_lower for keyword in ['india', 'china', 'japan', 'france', 'italy', 'spain', 
-                                                          'usa', 'america', 'uk', 'england', 'thailand', 'indonesia']):
-                specific_location_mentioned = True
-                break
-        
-        # 2. Apply quality threshold - ONLY show truly relevant results
-        QUALITY_THRESHOLD = 0.4  # Minimum acceptable match score (increased for better quality)
-        
-        # If user mentioned specific location, filter more strictly
-        if specific_location_mentioned:
-            # Find the country/region from query
-            for idx, row in results.iterrows():
-                country = str(row.get('country', '')).lower()
-                if country and country in query_lower:
-                    location_filter = country
-                    break
-            
-            if location_filter:
-                # STRICT FILTERING: Only show from that country
-                location_results = results[results['country'].str.lower() == location_filter]
-                if len(location_results) > 0:
-                    quality_results = location_results[location_results['final_score'] >= QUALITY_THRESHOLD]
-                    if len(quality_results) > 0:
-                        st.success(f"✅ Found {len(quality_results)} quality matches in {location_filter.title()}")
-                        final_results = quality_results.head(top_n)
-                    else:
-                        st.warning(f"⚠️ Limited matches in {location_filter.title()}. Showing best available:")
-                        final_results = location_results.head(min(3, top_n))
-                else:
-                    st.error(f"❌ No destinations found in {location_filter.title()}")
-                    return pd.DataFrame()
-            else:
-                # General quality filtering
-                quality_results = results[results['final_score'] >= QUALITY_THRESHOLD]
-                if len(quality_results) == 0:
-                    st.warning("⚠️ Limited matches found. Showing best available options:")
-                    final_results = results.head(min(3, top_n))
-                else:
-                    final_results = quality_results.head(top_n)
-                    if len(quality_results) < top_n:
-                        st.info(f"ℹ️ Found {len(quality_results)} quality matches (showing all)")
-        else:
-            # No specific location mentioned - use normal quality filtering
-            quality_results = results[results['final_score'] >= QUALITY_THRESHOLD]
-            
-            if len(quality_results) == 0:
-                st.warning("⚠️ Limited matches found. Showing best available options:")
-                final_results = results.head(min(3, top_n))
-            else:
-                # Return up to top_n quality results (may be less than requested)
-                final_results = quality_results.head(top_n)
-                if len(quality_results) < top_n:
-                    st.info(f"ℹ️ Found {len(quality_results)} quality matches (showing all)")
-        
-        # Generate AI insights if available and user query is provided
+        # ============================================================================
+        # STEP 4: AI VALIDATION & INSIGHTS
+        # ============================================================================
+        # Generate AI insights if available
         if self.gemini_enhancer and user_query and len(final_results) > 0:
             try:
-                # Limit AI insights to requested number
-                num_to_enhance = min(num_ai_insights, len(final_results))
-                destinations_to_enhance = final_results.head(num_to_enhance)
+                st.info("🤖 Generating AI insights for recommendations...")
                 
-                # Generate AI explanations
+                # Generate AI explanations for all results
                 ai_explanations = []
-                for idx, row in destinations_to_enhance.iterrows():
+                for idx, row in final_results.iterrows():
                     city = row.get('city', 'Unknown')
                     country = row.get('country', '')
                     
@@ -406,11 +412,11 @@ class TravelRecommender:
                     ai_explanations.append(explanation)
                 
                 # Add AI insights to results
-                final_results.loc[destinations_to_enhance.index, 'ai_insight'] = ai_explanations
+                final_results.loc[:, 'ai_insight'] = ai_explanations
                 
             except Exception as e:
                 print(f"Warning: Could not generate AI insights: {e}")
-                # Continue without AI insights
+                st.warning("⚠️ AI insights unavailable, showing results without AI validation")
         
         return final_results
     
